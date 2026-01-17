@@ -83,7 +83,7 @@ const ProductCard = ({ product, index }: ProductCardProps) => {
 
   return (
     <a
-      href={buyUrl}
+      href={importUrl}
       onClick={handleClick}
       target="_blank"
       rel="noopener noreferrer"
