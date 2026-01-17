@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Note: Using Supabase for database (cloud-hosted PostgreSQL)
+  # No local PostgreSQL container needed
+
+  # DesireFinder Frontend + Backend (Next.js)
+  desirefinder:
+    build:
+      context: .
+      dockerfile: Dockerfile.slim
+    container_name: desirefinder
+    ports:
+      - '3000:3000'
+    volumes:
+      - desirefinder-data:/home/perplexica/data
+      - desirefinder-uploads:/home/perplexica/uploads
+    environment:
+      # SearXNG URL (internal Docker network)
+      - SEARXNG_API_URL=http://searxng:8080
+      - NODE_ENV=production
+      # Data directory
+      - DATA_DIR=/home/perplexica/data
+      # Supabase Database (cloud-hosted PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL}
+      # Clerk
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - CLERK_WEBHOOK_SECRET=${CLERK_WEBHOOK_SECRET}
+      # NowPayments
+      - NOWPAYMENTS_API_KEY=${NOWPAYMENTS_API_KEY}
+      - NOWPAYMENTS_IPN_SECRET=${NOWPAYMENTS_IPN_SECRET}
+      # Gemini API
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      searxng:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - desirefinder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SearXNG Search Engine
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+      - searxng-data:/var/searxng
+    environment:
+      - SEARXNG_HOSTNAME=localhost
+    restart: unless-stopped
+    networks:
+      - desirefinder-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  desirefinder-network:
+    driver: bridge
+    name: desirefinder-network
+
+volumes:
+  desirefinder-data:
+    name: desirefinder-data
+  desirefinder-uploads:
+    name: desirefinder-uploads
+  searxng-data:
+    name: searxng-data

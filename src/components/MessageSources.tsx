@@ -9,8 +9,23 @@ import {
 import { File } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { Chunk } from '@/lib/types';
+import ProductResults from './ProductCard';
 
 const MessageSources = ({ sources }: { sources: Chunk[] }) => {
+  // Check if these are product results
+  const isProductResults = sources.some(
+    (source) =>
+      source.metadata.type === 'product' ||
+      source.metadata.productId ||
+      source.metadata.productImage ||
+      source.metadata.productPrice ||
+      (source.metadata.price !== undefined && source.metadata.imageUrl),
+  );
+
+  // If product results, use ProductResults component
+  if (isProductResults) {
+    return <ProductResults sources={sources} />;
+  }
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const closeModal = () => {

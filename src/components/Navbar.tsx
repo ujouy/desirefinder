@@ -12,6 +12,8 @@ import {
 import jsPDF from 'jspdf';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import { SourceBlock } from '@/lib/types';
+import CreditDisplay from './CreditDisplay';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 
 const downloadFile = (filename: string, content: string, type: string) => {
   const blob = new Blob([content], { type });
@@ -256,7 +258,26 @@ const Navbar = () => {
             </h1>
           </div>
 
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <SignedIn>
+              <CreditDisplay />
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="px-4 py-1.5 text-sm font-medium rounded-lg bg-[#24A0ED] text-white hover:bg-[#1e8dd8] transition-colors duration-200">
+                  Sign In
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                  }
+                }}
+              />
+            </SignedIn>
             <Popover className="relative">
               <PopoverButton className="p-2 rounded-lg hover:bg-light-secondary dark:hover:bg-dark-secondary transition-colors duration-200">
                 <Share size={16} className="text-black/60 dark:text-white/60" />

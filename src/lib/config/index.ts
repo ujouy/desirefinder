@@ -7,7 +7,8 @@ import { getModelProvidersUIConfigSection } from '../models/providers';
 class ConfigManager {
   configPath: string = path.join(
     process.env.DATA_DIR || process.cwd(),
-    '/data/config.json',
+    'data',
+    'config.json',
   );
   configVersion = 1;
   currentConfig: Config = {
@@ -16,9 +17,7 @@ class ConfigManager {
     preferences: {},
     personalization: {},
     modelProviders: [],
-    search: {
-      searxngURL: '',
-    },
+    search: {},
   };
   uiConfigSections: UIConfigSections = {
     preferences: [
@@ -60,33 +59,6 @@ class ConfigManager {
         default: 'Metric',
         scope: 'client',
       },
-      {
-        name: 'Auto video & image search',
-        key: 'autoMediaSearch',
-        type: 'switch',
-        required: false,
-        description: 'Automatically search for relevant images and videos.',
-        default: true,
-        scope: 'client',
-      },
-      {
-        name: 'Show weather widget',
-        key: 'showWeatherWidget',
-        type: 'switch',
-        required: false,
-        description: 'Display the weather card on the home screen.',
-        default: true,
-        scope: 'client',
-      },
-      {
-        name: 'Show news widget',
-        key: 'showNewsWidget',
-        type: 'switch',
-        required: false,
-        description: 'Display the recent news card on the home screen.',
-        default: true,
-        scope: 'client',
-      },
     ],
     personalization: [
       {
@@ -101,19 +73,7 @@ class ConfigManager {
       },
     ],
     modelProviders: [],
-    search: [
-      {
-        name: 'SearXNG URL',
-        key: 'searxngURL',
-        type: 'string',
-        required: false,
-        description: 'The URL of your SearXNG instance',
-        placeholder: 'http://localhost:4000',
-        default: '',
-        scope: 'server',
-        env: 'SEARXNG_API_URL',
-      },
-    ],
+    search: [],
   };
 
   constructor() {
@@ -123,6 +83,13 @@ class ConfigManager {
   private initialize() {
     this.initializeConfig();
     this.initializeFromEnv();
+    this.initializeDefaultModels();
+  }
+
+  private initializeDefaultModels() {
+    // Auto-configure default uncensored models for SaaS
+    const { initializeDefaultModels } = require('./defaultModels');
+    initializeDefaultModels(this);
   }
 
   private saveConfig() {
@@ -133,6 +100,12 @@ class ConfigManager {
   }
 
   private initializeConfig() {
+    // Ensure the directory exists
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+
     const exists = fs.existsSync(this.configPath);
     if (!exists) {
       fs.writeFileSync(

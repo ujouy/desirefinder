@@ -1,0 +1,42 @@
+# SearXNG Configuration for Adult Content Search
+# This configuration disables SafeSearch and enables necessary search engines
+# 
+# IMPORTANT: Replace your existing searxng/settings.yml with this content
+# or merge these settings into your existing configuration
+
+# Disable SafeSearch completely
+safe_search: 0
+
+# Enable search engines that support site: operator filtering
+# Google, Bing, and DuckDuckGo all support site: filters
+engines:
+  - google
+  - bing
+  - duckduckgo
+
+# General settings
+general:
+  # Enable JSON format for API responses
+  formats:
+    - json
+    - html
+
+# Search settings
+search:
+  # Disable autocomplete suggestions that might filter content
+  autocomplete: ""
+
+# Result settings
+result_proxy:
+  # Enable result proxying if needed
+  proxied: true
+
+# UI settings (optional, for direct SearXNG UI access)
+ui:
+  # Disable any content filtering in the UI
+  infinite_scroll: true
+
+# Note: After updating this file, restart your SearXNG Docker container:
+# docker-compose restart searxng
+# or
+# docker restart <searxng-container-name>

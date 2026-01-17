@@ -4,51 +4,48 @@ import { classify } from './classifier';
 import Researcher from './researcher';
 import { getWriterPrompt } from '@/lib/prompts/search/writer';
 import { WidgetExecutor } from './widgets';
-import db from '@/lib/db';
-import { chats, messages } from '@/lib/db/schema';
-import { and, eq, gt } from 'drizzle-orm';
+import { prisma } from '@/lib/db/prisma';
 import { TextBlock } from '@/lib/types';
 
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
-    const exists = await db.query.messages.findFirst({
-      where: and(
-        eq(messages.chatId, input.chatId),
-        eq(messages.messageId, input.messageId),
-      ),
+    // Check if message already exists
+    const exists = await prisma.message.findUnique({
+      where: { messageId: input.messageId },
     });
 
     if (!exists) {
-      await db.insert(messages).values({
-        chatId: input.chatId,
-        messageId: input.messageId,
-        backendId: session.id,
-        query: input.followUp,
-        createdAt: new Date().toISOString(),
-        status: 'answering',
-        responseBlocks: [],
+      // Create new message
+      await prisma.message.create({
+        data: {
+          messageId: input.messageId,
+          chatId: input.chatId,
+          backendId: session.id,
+          query: input.followUp,
+          status: 'answering',
+          responseBlocks: [],
+        },
       });
     } else {
-      await db
-        .delete(messages)
-        .where(
-          and(eq(messages.chatId, input.chatId), gt(messages.id, exists.id)),
-        )
-        .execute();
-      await db
-        .update(messages)
-        .set({
+      // Delete messages after this one (for regeneration)
+      await prisma.message.deleteMany({
+        where: {
+          chatId: input.chatId,
+          createdAt: {
+            gt: exists.createdAt,
+          },
+        },
+      });
+
+      // Update existing message
+      await prisma.message.update({
+        where: { messageId: input.messageId },
+        data: {
           status: 'answering',
           backendId: session.id,
           responseBlocks: [],
-        })
-        .where(
-          and(
-            eq(messages.chatId, input.chatId),
-            eq(messages.messageId, input.messageId),
-          ),
-        )
-        .execute();
+        },
+      });
     }
 
     const classification = await classify({
@@ -118,6 +115,7 @@ class SearchAgent {
       finalContextWithWidgets,
       input.config.systemInstructions,
       input.config.mode,
+      input.config.sources,
     );
     const answerStream = input.config.llm.streamText({
       messages: [
@@ -167,19 +165,35 @@ class SearchAgent {
 
     session.emit('end', {});
 
-    await db
-      .update(messages)
-      .set({
+    // Update message with final response
+    await prisma.message.update({
+      where: { messageId: input.messageId },
+      data: {
         status: 'completed',
-        responseBlocks: session.getAllBlocks(),
-      })
-      .where(
-        and(
-          eq(messages.chatId, input.chatId),
-          eq(messages.messageId, input.messageId),
-        ),
-      )
-      .execute();
+        responseBlocks: session.getAllBlocks() as any,
+      },
+    });
+
+    // Track search history (optional - for analytics)
+    try {
+      const chat = await prisma.chat.findUnique({
+        where: { id: input.chatId },
+        select: { userId: true },
+      });
+
+      if (chat?.userId) {
+        await prisma.searchHistory.create({
+          data: {
+            userId: chat.userId,
+            query: input.followUp,
+            sources: input.config.sources as any,
+          },
+        });
+      }
+    } catch (err) {
+      // Don't fail if search history tracking fails
+      console.warn('Failed to track search history:', err);
+    }
   }
 }
 

@@ -17,7 +17,7 @@ export const POST = async (
     const writer = responseStream.writable.getWriter();
     const encoder = new TextEncoder();
 
-    const disconnect = session.subscribe((event, data) => {
+    const handler = (event: string, data: any) => {
       if (event === 'data') {
         if (data.type === 'block') {
           writer.write(
@@ -56,7 +56,7 @@ export const POST = async (
           ),
         );
         writer.close();
-        disconnect();
+        session.removeAllListeners();
       } else if (event === 'error') {
         writer.write(
           encoder.encode(
@@ -67,12 +67,16 @@ export const POST = async (
           ),
         );
         writer.close();
-        disconnect();
+        session.removeAllListeners();
       }
-    });
+    };
+
+    session.on('data', (data: any) => handler('data', data));
+    session.on('end', () => handler('end', {}));
+    session.on('error', (error: any) => handler('error', { data: error }));
 
     req.signal.addEventListener('abort', () => {
-      disconnect();
+      session.removeAllListeners();
       writer.close();
     });
 

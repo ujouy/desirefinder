@@ -5,9 +5,8 @@ import SearchAgent from '@/lib/agents/search';
 import SessionManager from '@/lib/session';
 import { ChatTurnMessage } from '@/lib/types';
 import { SearchSources } from '@/lib/agents/search/types';
-import db from '@/lib/db';
-import { eq } from 'drizzle-orm';
-import { chats } from '@/lib/db/schema';
+import { prisma } from '@/lib/db/prisma';
+import { auth } from '@clerk/nextjs/server';
 import UploadManager from '@/lib/uploads/manager';
 
 export const runtime = 'nodejs';
@@ -75,24 +74,41 @@ const ensureChatExists = async (input: {
   fileIds: string[];
 }) => {
   try {
-    const exists = await db.query.chats
-      .findFirst({
-        where: eq(chats.id, input.id),
-      })
-      .execute();
+    const { userId } = await auth();
+    
+    if (!userId) {
+      console.warn('Cannot create chat: user not authenticated');
+      return;
+    }
+
+    // Get or create user
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!user) {
+      console.warn('Cannot create chat: user not found in database');
+      return;
+    }
+
+    const exists = await prisma.chat.findUnique({
+      where: { id: input.id },
+    });
 
     if (!exists) {
-      await db.insert(chats).values({
-        id: input.id,
-        createdAt: new Date().toISOString(),
-        sources: input.sources,
-        title: input.query,
-        files: input.fileIds.map((id) => {
-          return {
-            fileId: id,
-            name: UploadManager.getFile(id)?.name || 'Uploaded File',
-          };
-        }),
+      await prisma.chat.create({
+        data: {
+          id: input.id,
+          userId: user.id,
+          title: input.query.slice(0, 200), // Limit title length
+          sources: input.sources as any, // JSON field
+          files: input.fileIds.map((id) => {
+            return {
+              fileId: id,
+              name: UploadManager.getFile(id)?.name || 'Uploaded File',
+            };
+          }) as any, // JSON field
+        },
       });
     }
   } catch (err) {
@@ -156,7 +172,7 @@ export const POST = async (req: Request) => {
     const writer = responseStream.writable.getWriter();
     const encoder = new TextEncoder();
 
-    const disconnect = session.subscribe((event: string, data: any) => {
+    const handler = (event: string, data: any) => {
       if (event === 'data') {
         if (data.type === 'block') {
           writer.write(
@@ -208,7 +224,11 @@ export const POST = async (req: Request) => {
         writer.close();
         session.removeAllListeners();
       }
-    });
+    };
+
+    session.on('data', (data: any) => handler('data', data));
+    session.on('end', () => handler('end', {}));
+    session.on('error', (error: any) => handler('error', { data: error }));
 
     agent.searchAsync(session, {
       chatHistory: history,
@@ -233,7 +253,7 @@ export const POST = async (req: Request) => {
     });
 
     req.signal.addEventListener('abort', () => {
-      disconnect();
+      session.removeAllListeners();
       writer.close();
     });
 

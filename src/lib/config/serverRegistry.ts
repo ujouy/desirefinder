@@ -11,5 +11,3 @@ export const getConfiguredModelProviderById = (
   return getConfiguredModelProviders().find((p) => p.id === id) ?? undefined;
 };
 
-export const getSearxngURL = () =>
-  configManager.getConfig('search.searxngURL', '');

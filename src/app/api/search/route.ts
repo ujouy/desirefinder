@@ -4,6 +4,7 @@ import SessionManager from '@/lib/session';
 import { ChatTurnMessage } from '@/lib/types';
 import { SearchSources } from '@/lib/agents/search/types';
 import APISearchAgent from '@/lib/agents/search/api';
+import { checkCredits, spendCredit, insufficientCreditsResponse } from '@/lib/middleware/checkCredits';
 
 interface ChatRequestBody {
   optimizationMode: 'speed' | 'balanced' | 'quality';
@@ -24,6 +25,36 @@ export const POST = async (req: Request) => {
       return Response.json(
         { message: 'Missing sources or query' },
         { status: 400 },
+      );
+    }
+
+    // Check credits before processing (using Clerk auth)
+    const creditCheck = await checkCredits();
+
+    if (!creditCheck) {
+      return Response.json(
+        {
+          message: 'Authentication required. Please sign in to search.',
+          error: 'UNAUTHORIZED',
+        },
+        { status: 401 },
+      );
+    }
+
+    if (creditCheck.credits <= 0) {
+      return insufficientCreditsResponse();
+    }
+
+    // Spend one credit
+    const creditSpent = await spendCredit(creditCheck.userId);
+
+    if (!creditSpent) {
+      return Response.json(
+        {
+          message: 'Failed to process credits. Please try again.',
+          error: 'CREDIT_PROCESSING_ERROR',
+        },
+        { status: 500 },
       );
     }
 
@@ -75,7 +106,7 @@ export const POST = async (req: Request) => {
           let message = '';
           let sources: any[] = [];
 
-          session.subscribe((event: string, data: Record<string, any>) => {
+          const handler = (event: string, data: Record<string, any>) => {
             if (event === 'data') {
               try {
                 if (data.type === 'response') {
@@ -105,7 +136,11 @@ export const POST = async (req: Request) => {
                 ),
               );
             }
-          });
+          };
+
+          session.on('data', (data: any) => handler('data', data));
+          session.on('end', () => handler('end', {}));
+          session.on('error', (error: any) => handler('error', error));
         },
       );
     }
@@ -136,7 +171,7 @@ export const POST = async (req: Request) => {
           } catch (error) {}
         });
 
-        session.subscribe((event: string, data: Record<string, any>) => {
+        const handler = (event: string, data: Record<string, any>) => {
           if (event === 'data') {
             if (signal.aborted) return;
 
@@ -184,7 +219,11 @@ export const POST = async (req: Request) => {
 
             controller.error(data);
           }
-        });
+        };
+
+        session.on('data', (data: any) => handler('data', data));
+        session.on('end', () => handler('end', {}));
+        session.on('error', (error: any) => handler('error', error));
       },
       cancel() {
         abortController.abort();

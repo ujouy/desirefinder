@@ -1,6 +1,5 @@
-import db from '@/lib/db';
-import { chats, messages } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { prisma } from '@/lib/db/prisma';
+import { auth } from '@clerk/nextjs/server';
 
 export const GET = async (
   req: Request,
@@ -8,23 +7,42 @@ export const GET = async (
 ) => {
   try {
     const { id } = await params;
+    const { userId } = await auth();
 
-    const chatExists = await db.query.chats.findFirst({
-      where: eq(chats.id, id),
+    if (!userId) {
+      return Response.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
     });
 
-    if (!chatExists) {
+    if (!user) {
+      return Response.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // Get chat with messages
+    const chat = await prisma.chat.findFirst({
+      where: {
+        id,
+        userId: user.id, // Ensure user owns this chat
+      },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!chat) {
       return Response.json({ message: 'Chat not found' }, { status: 404 });
     }
 
-    const chatMessages = await db.query.messages.findMany({
-      where: eq(messages.chatId, id),
-    });
-
     return Response.json(
       {
-        chat: chatExists,
-        messages: chatMessages,
+        chat,
+        messages: chat.messages,
       },
       { status: 200 },
     );
@@ -43,17 +61,37 @@ export const DELETE = async (
 ) => {
   try {
     const { id } = await params;
+    const { userId } = await auth();
 
-    const chatExists = await db.query.chats.findFirst({
-      where: eq(chats.id, id),
+    if (!userId) {
+      return Response.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
     });
 
-    if (!chatExists) {
+    if (!user) {
+      return Response.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // Verify chat belongs to user
+    const chat = await prisma.chat.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
+    });
+
+    if (!chat) {
       return Response.json({ message: 'Chat not found' }, { status: 404 });
     }
 
-    await db.delete(chats).where(eq(chats.id, id)).execute();
-    await db.delete(messages).where(eq(messages.chatId, id)).execute();
+    // Delete chat (messages will be cascade deleted)
+    await prisma.chat.delete({
+      where: { id },
+    });
 
     return Response.json(
       { message: 'Chat deleted successfully' },

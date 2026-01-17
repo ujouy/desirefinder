@@ -7,31 +7,24 @@ const schema = z.object({
   classification: z.object({
     skipSearch: z
       .boolean()
-      .describe('Indicates whether to skip the search step.'),
+      .describe('Indicates whether to skip the product search step.'),
     personalSearch: z
       .boolean()
-      .describe('Indicates whether to perform a personal search.'),
-    academicSearch: z
+      .describe('Indicates whether to perform a personal search through uploaded documents.'),
+    needsClarification: z
       .boolean()
-      .describe('Indicates whether to perform an academic search.'),
-    discussionSearch: z
-      .boolean()
-      .describe('Indicates whether to perform a discussion search.'),
-    showWeatherWidget: z
-      .boolean()
-      .describe('Indicates whether to show the weather widget.'),
-    showStockWidget: z
-      .boolean()
-      .describe('Indicates whether to show the stock widget.'),
-    showCalculationWidget: z
-      .boolean()
-      .describe('Indicates whether to show the calculation widget.'),
+      .optional()
+      .describe('If true, the query is too vague/ambiguous and needs clarifying questions before searching. Set to true if query is < 5 words and lacks specific details (e.g., "I want a bag" vs "I want a minimalist leather briefcase for work").'),
   }),
   standaloneFollowUp: z
     .string()
     .describe(
       "A self-contained, context-independent reformulation of the user's question.",
     ),
+  clarifyingQuestion: z
+    .string()
+    .optional()
+    .describe('If needsClarification is true, provide a helpful clarifying question to ask the user (e.g., "Are we going for \'Professional Minimalist\' (leather, structured) or \'Urban Explorer\' (techwear, waterproof, modular)?").'),
 });
 
 export const classify = async (input: ClassifierInput) => {

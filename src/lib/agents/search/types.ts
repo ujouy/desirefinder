@@ -4,7 +4,7 @@ import BaseEmbedding from '@/lib/models/base/embedding';
 import SessionManager from '@/lib/session';
 import { ChatTurnMessage, Chunk } from '@/lib/types';
 
-export type SearchSources = 'web' | 'discussions' | 'academic';
+export type SearchSources = 'shopping';
 
 export type SearchAgentConfig = {
   sources: SearchSources[];
@@ -53,11 +53,6 @@ export type ClassifierOutput = {
   classification: {
     skipSearch: boolean;
     personalSearch: boolean;
-    academicSearch: boolean;
-    discussionSearch: boolean;
-    showWeatherWidget: boolean;
-    showStockWidget: boolean;
-    showCalculationWidget: boolean;
   };
   standaloneFollowUp: string;
 };

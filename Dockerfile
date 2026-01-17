@@ -7,10 +7,10 @@ WORKDIR /home/perplexica
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --network-timeout 600000
 
-COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js drizzle.config.ts tailwind.config.ts ./
+COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js tailwind.config.ts ./
+COPY prisma ./prisma
 COPY src ./src
 COPY public ./public
-COPY drizzle ./drizzle
 
 RUN mkdir -p /home/perplexica/data
 RUN yarn build
@@ -30,7 +30,6 @@ COPY --from=builder /home/perplexica/public ./public
 COPY --from=builder /home/perplexica/.next/static ./public/_next/static
 COPY --from=builder /home/perplexica/.next/standalone ./
 COPY --from=builder /home/perplexica/data ./data
-COPY drizzle ./drizzle
 
 RUN mkdir /home/perplexica/uploads
 

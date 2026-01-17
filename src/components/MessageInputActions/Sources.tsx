@@ -5,28 +5,15 @@ import {
   PopoverPanel,
   Switch,
 } from '@headlessui/react';
-import {
-  GlobeIcon,
-  GraduationCapIcon,
-  NetworkIcon,
-} from '@phosphor-icons/react';
+import { ShoppingBag } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
 const sourcesList = [
   {
-    name: 'Web',
-    key: 'web',
-    icon: <GlobeIcon className="h-[16px] w-auto" />,
-  },
-  {
-    name: 'Academic',
-    key: 'academic',
-    icon: <GraduationCapIcon className="h-[16px] w-auto" />,
-  },
-  {
-    name: 'Social',
-    key: 'discussions',
-    icon: <NetworkIcon className="h-[16px] w-auto" />,
+    name: 'Shopping',
+    key: 'shopping',
+    icon: <ShoppingBag size={16} />,
+    description: 'AI-powered product recommendations and shopping',
   },
 ];
 
@@ -38,7 +25,7 @@ const Sources = () => {
       {({ open }) => (
         <>
           <PopoverButton className="flex items-center justify-center active:border-none hover:bg-light-200 hover:dark:bg-dark-200 p-2 rounded-lg focus:outline-none text-black/50 dark:text-white/50 active:scale-95 transition duration-200 hover:text-black dark:hover:text-white">
-            <GlobeIcon className="h-[18px] w-auto" />
+            <ShoppingBag size={18} />
           </PopoverButton>
           <AnimatePresence>
             {open && (

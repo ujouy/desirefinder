@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # 1. Your Next.js App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.slim
+    container_name: desirefinder-app
+    restart: always
+    env_file: .env.production
+    ports:
+      - "3000:3000"
+    volumes:
+      # CRITICAL: Persist Next.js Cache so it doesn't reset on deploy
+      - next_cache:/app/.next/cache
+      - app_data:/home/perplexica/data
+      - app_uploads:/home/perplexica/uploads
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/home/perplexica/data
+    depends_on:
+      - db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 2. Database (Postgres) - Cheaper than Managed DB for starting
+  db:
+    image: postgres:15-alpine
+    container_name: desirefinder-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USER:-desirefinder}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME:-desirefinder}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-desirefinder}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. Nginx (The Security Guard & Reverse Proxy)
+  nginx:
+    image: nginx:alpine
+    container_name: desirefinder-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+    name: desirefinder-postgres-data
+  next_cache:
+    name: desirefinder-next-cache
+  app_data:
+    name: desirefinder-app-data
+  app_uploads:
+    name: desirefinder-uploads
+  nginx_cache:
+    name: desirefinder-nginx-cache
+
+networks:
+  app-network:
+    driver: bridge
+    name: desirefinder-network

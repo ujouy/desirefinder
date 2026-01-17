@@ -15,7 +15,6 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
 import { MinimalProvider } from '../models/types';
-import { getAutoMediaSearch } from '../config/clientRegistry';
 import { applyPatch } from 'rfc6902';
 import { Widget } from '@/components/ChatWindow';
 
@@ -287,7 +286,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [fileIds, setFileIds] = useState<string[]>([]);
 
-  const [sources, setSources] = useState<string[]>(['web']);
+  const [sources, setSources] = useState<string[]>(['shopping']);
   const [optimizationMode, setOptimizationMode] = useState('speed');
 
   const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
@@ -664,19 +663,6 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
         const lastMsg = messagesRef.current[messagesRef.current.length - 1];
 
-        const autoMediaSearch = getAutoMediaSearch();
-
-        if (autoMediaSearch) {
-          setTimeout(() => {
-            document
-              .getElementById(`search-images-${lastMsg.messageId}`)
-              ?.click();
-
-            document
-              .getElementById(`search-videos-${lastMsg.messageId}`)
-              ?.click();
-          }, 200);
-        }
 
         // Check if there are sources and no suggestions
 

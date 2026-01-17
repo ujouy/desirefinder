@@ -1,0 +1,165 @@
+// Prisma Schema for DesireFinder SaaS
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique // Matches Clerk user ID
+  email     String   @unique
+  credits   Int      @default(3) // Free trial credits
+  isPremium Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  affiliateClicks AffiliateClick[]
+  orders Order[]
+  chats Chat[]
+  searchHistory SearchHistory[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Float    // USD value
+  creditsAdded Int     // Number of credits purchased
+  status      String   // PENDING, COMPLETED, FAILED
+  paymentId   String?  @unique // External ID from NowPayments
+  packageId   String?  // e.g., "100-credits", "200-credits"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentId])
+}
+
+model AffiliateClick {
+  id          String   @id @default(uuid())
+  userId      String
+  productId   String?
+  vendor      String?
+  originalUrl String
+  affiliateUrl String
+  clickedAt   DateTime @default(now())
+  converted   Int      @default(0) // 0 = no, 1 = yes
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([vendor])
+  @@index([clickedAt])
+}
+
+// On-demand product creation for Infinite Aisle
+model Product {
+  id              String   @id @default(uuid())
+  supplierProductId String // Original product ID from supplier (AliExpress, etc.)
+  name            String
+  description     String?
+  supplierPrice   Float    // Original price from supplier
+  markedUpPrice   Float    // Price with markup (2.5x)
+  currency        String   @default("USD")
+  imageUrl        String?
+  supplierUrl     String   // Original supplier URL
+  vendor          String?
+  category        String?
+  rating          Float?
+  reviews         Int?
+  orders          Int?
+  shippingDays    Int?
+  shippingMethod  String?
+  inStock         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orders Order[]
+
+  @@index([supplierProductId])
+  @@index([vendor])
+  @@index([category])
+}
+
+// Orders for on-demand fulfillment
+model Order {
+  id              String   @id @default(uuid())
+  userId          String
+  productId       String
+  quantity        Int      @default(1)
+  unitPrice       Float    // Marked up price
+  totalPrice      Float
+  supplierPrice   Float    // Original supplier price
+  status          String   // PENDING, PROCESSING, FULFILLED, CANCELLED
+  paymentIntentId String?  // Stripe payment intent ID
+  fulfillmentId   String?  // DSers or fulfillment service ID
+  trackingNumber  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Chat and Message models (migrated from Drizzle/SQLite to Prisma/Postgres)
+model Chat {
+  id        String   @id @default(uuid())
+  userId    String   // Required - link to authenticated User
+  title     String
+  sources   Json     @default("[]") // SearchSources array as JSON
+  files     Json     @default("[]") // File metadata array as JSON
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  messageId     String   @unique // Client-generated message ID
+  chatId        String
+  backendId     String   // Session/backend ID for streaming
+  query         String   // User's query
+  createdAt     DateTime @default(now())
+  responseBlocks Json    @default("[]") // Response blocks (text, sources, etc.)
+  status        String   @default("answering") // "answering", "completed", "error"
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@index([messageId])
+  @@index([status])
+}
+
+// Search history for analytics and personalization
+model SearchHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  query     String
+  sources   Json?    // SearchSources used
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}

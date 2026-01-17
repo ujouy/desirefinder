@@ -69,6 +69,7 @@ class APISearchAgent {
       finalContextWithWidgets,
       input.config.systemInstructions,
       input.config.mode,
+      input.config.sources,
     );
 
     const answerStream = input.config.llm.streamText({

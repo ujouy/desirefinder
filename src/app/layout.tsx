@@ -10,6 +10,7 @@ import ThemeProvider from '@/components/theme/Provider';
 import configManager from '@/lib/config';
 import SetupWizard from '@/components/Setup/SetupWizard';
 import { ChatProvider } from '@/lib/hooks/useChat';
+import { ClerkProvider } from '@clerk/nextjs';
 
 const montserrat = Montserrat({
   weight: ['300', '400', '500', '700'],
@@ -19,9 +20,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'Perplexica - Chat with the internet',
+  title: 'DesireFinder - AI-Powered Shopping Assistant',
   description:
-    'Perplexica is an AI powered chatbot that is connected to the internet.',
+    "DesireFinder is an AI-powered shopping assistant that helps you discover products based on your needs, style, and preferences. Describe what you want, and we'll find the perfect products for you.",
 };
 
 export default function RootLayout({
@@ -33,27 +34,29 @@ export default function RootLayout({
   const configSections = configManager.getUIConfigSections();
 
   return (
-    <html className="h-full" lang="en" suppressHydrationWarning>
-      <body className={cn('h-full antialiased', montserrat.className)}>
-        <ThemeProvider>
-          {setupComplete ? (
-            <ChatProvider>
-              <Sidebar>{children}</Sidebar>
-              <Toaster
-                toastOptions={{
-                  unstyled: true,
-                  classNames: {
-                    toast:
-                      'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
-                  },
-                }}
-              />
-            </ChatProvider>
-          ) : (
-            <SetupWizard configSections={configSections} />
-          )}
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html className="h-full" lang="en" suppressHydrationWarning>
+        <body className={cn('h-full antialiased', montserrat.className)}>
+          <ThemeProvider>
+            {setupComplete ? (
+              <ChatProvider>
+                <Sidebar>{children}</Sidebar>
+                <Toaster
+                  toastOptions={{
+                    unstyled: true,
+                    classNames: {
+                      toast:
+                        'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
+                    },
+                  }}
+                />
+              </ChatProvider>
+            ) : (
+              <SetupWizard configSections={configSections} />
+            )}
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
