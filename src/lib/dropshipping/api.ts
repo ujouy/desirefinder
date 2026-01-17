@@ -166,7 +166,7 @@ async function _searchProductsInternal(
  * This provides request-level deduplication (same query in same request = 1 API call)
  */
 const getCachedSearch = cache(
-  async (query: string, limit: number, shipToCountry: string, sortBy: string) => {
+  async (query: string, limit: number, shipToCountry: string, sortBy: 'ORDERS_DESC' | 'RATING_DESC' | 'PRICE_ASC' | 'PRICE_DESC') => {
     return _searchProductsInternal({ query, limit, shipToCountry, sortBy });
   }
 );
