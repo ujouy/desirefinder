@@ -13,9 +13,10 @@ COPY src ./src
 COPY public ./public
 
 RUN mkdir -p /home/perplexica/data
-# Generate Prisma client (doesn't need database connection)
-# If it fails, continue anyway - we'll run it at runtime with proper env vars
-RUN yarn db:generate || echo "Prisma generate failed, will retry at runtime"
+# Generate Prisma client (doesn't need database connection, just reads schema)
+# Set a dummy DATABASE_URL to satisfy Prisma's env requirement during build
+ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
+RUN yarn db:generate
 RUN yarn build
 
 FROM node:24.5.0-slim
