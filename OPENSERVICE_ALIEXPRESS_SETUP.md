@@ -35,12 +35,21 @@ Upload your app logo (optional but recommended)
 After submitting the form:
 
 1. **Wait for Approval**: AliExpress will review your application (usually 1-3 business days)
-2. **Get App Key & Secret**: Once approved, you'll receive:
-   - `APP_KEY` (also called Client ID)
-   - `APP_SECRET` (also called Client Secret)
-   - `ACCESS_TOKEN` (for API calls)
 
-3. **Save These Credentials**: You'll need them for your `.env.production` file
+2. **Once Approved, Go to OpenService Dashboard**:
+   - Login at https://open.aliexpress.com
+   - Navigate to **"My Apps"** or **"Application Management"**
+   - Find your "DesireFinder" app
+   - Click on it to view details
+
+3. **Get Your Credentials**:
+   - **APP_KEY** (Client ID): Found in the app details page
+   - **APP_SECRET** (Client Secret): Found in the app details page (may need to click "Show Secret")
+   - **ACCESS_TOKEN**: This depends on the API type:
+     - **For Product Search APIs**: You may get a direct access token in the dashboard
+     - **For OAuth APIs**: You'll need to complete the OAuth flow (see Step 4)
+
+4. **Save These Credentials**: You'll need them for your `.env.production` file
 
 ---
 
@@ -59,13 +68,49 @@ ALIEXPRESS_API_URL=https://api-sg.aliexpress.com
 
 ---
 
-## 🔄 Step 4: OAuth Flow (If Required)
+## 🔄 Step 4: Getting the Access Token
 
-Some OpenService APIs require OAuth2 authentication. If your API requires it:
+There are two ways to get an access token, depending on your API type:
 
-1. **Authorization URL**: Users/sellers authorize your app
-2. **Callback Handler**: We'll create `/api/dropshipping/aliexpress/callback` to handle the OAuth callback
-3. **Token Refresh**: Access tokens may expire and need refresh
+### Option A: Direct Access Token (Product Search APIs)
+
+Some OpenService APIs provide a **direct access token** in the dashboard:
+
+1. Go to your app in OpenService dashboard
+2. Look for **"Access Token"** or **"API Token"** section
+3. Copy the token directly
+4. Add to `.env.production`:
+   ```env
+   ALIEXPRESS_ACCESS_TOKEN=your_token_here
+   ```
+
+### Option B: OAuth Flow (If Required)
+
+If your API requires OAuth2 authentication:
+
+1. **Get Authorization Code**:
+   - Visit the authorization URL (provided in OpenService docs)
+   - User/seller authorizes your app
+   - Redirects to your callback URL with `?code=AUTHORIZATION_CODE`
+
+2. **Exchange Code for Token**:
+   - Your callback endpoint (`/api/dropshipping/aliexpress/callback`) receives the code
+   - Makes a POST request to OpenService token endpoint:
+     ```
+     POST https://api-sg.aliexpress.com/oauth/token
+     {
+       "grant_type": "authorization_code",
+       "client_id": "YOUR_APP_KEY",
+       "client_secret": "YOUR_APP_SECRET",
+       "code": "AUTHORIZATION_CODE",
+       "redirect_uri": "https://desirefinder.com/api/dropshipping/aliexpress/callback"
+     }
+     ```
+   - Response contains `access_token` and `refresh_token`
+
+3. **Store the Token**: Save the access token to your `.env.production` or database
+
+**Note**: For dropshipping/product search, you typically get a direct access token (Option A) rather than needing OAuth.
 
 ---
 
