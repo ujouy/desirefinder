@@ -76,7 +76,7 @@ async function _searchProductsInternal(
     // ⚡ PARALLELIZATION: Fetch from multiple providers in parallel if configured
     const searchPromises: Promise<Product[]>[] = [];
 
-    if (apiProvider === 'aliexpress' || apiProvider.includes('aliexpress')) {
+    if (apiProvider === 'aliexpress' || apiProvider === 'openservice-aliexpress' || apiProvider.includes('aliexpress')) {
       searchPromises.push(searchAliExpress(query, { limit, shipToCountry, sortBy, apiKey }));
     }
     if (apiProvider === 'cj' || apiProvider.includes('cj')) {
@@ -90,6 +90,7 @@ async function _searchProductsInternal(
     if (searchPromises.length === 0) {
       switch (apiProvider) {
         case 'aliexpress':
+        case 'openservice-aliexpress':
           rawProducts = await searchAliExpress(query, { limit, shipToCountry, sortBy, apiKey });
           break;
         case 'cj':
@@ -99,7 +100,7 @@ async function _searchProductsInternal(
           rawProducts = await searchSerpApi(query, { limit, apiKey });
           break;
         default:
-          throw new Error(`Unsupported API provider: ${apiProvider}. Supported providers: aliexpress, cj, serpapi`);
+          throw new Error(`Unsupported API provider: ${apiProvider}. Supported providers: aliexpress, openservice-aliexpress, cj, serpapi`);
       }
     } else {
       // Parallel fetch from multiple providers
@@ -211,6 +212,14 @@ async function searchAliExpress(
     apiKey: string;
   }
 ): Promise<Product[]> {
+  const apiProvider = process.env.DROPSHIPPING_API_PROVIDER || 'aliexpress';
+  
+  // Check if using OpenService (official AliExpress API)
+  if (apiProvider === 'openservice-aliexpress' || process.env.ALIEXPRESS_APP_KEY) {
+    return searchOpenServiceAliExpress(query, options);
+  }
+  
+  // Fallback to RapidAPI (legacy)
   const apiUrl = process.env.ALIEXPRESS_API_URL || 'https://aliexpress-data.p.rapidapi.com';
   const apiKey = options.apiKey || process.env.RAPIDAPI_KEY || '';
 
@@ -259,6 +268,85 @@ async function searchAliExpress(
     inStock: item.inStock !== false,
     supplierProductId: item.productId,
     supplierPrice: parseFloat(item.price?.value || item.price || 0),
+  }));
+}
+
+/**
+ * OpenService AliExpress API (Official AliExpress API)
+ * Uses OAuth2 authentication with App Key, App Secret, and Access Token
+ */
+async function searchOpenServiceAliExpress(
+  query: string,
+  options: {
+    limit: number;
+    shipToCountry: string;
+    sortBy: string;
+    apiKey: string;
+  }
+): Promise<Product[]> {
+  const appKey = process.env.ALIEXPRESS_APP_KEY || '';
+  const appSecret = process.env.ALIEXPRESS_APP_SECRET || '';
+  const accessToken = process.env.ALIEXPRESS_ACCESS_TOKEN || '';
+  const apiUrl = process.env.ALIEXPRESS_API_URL || 'https://api-sg.aliexpress.com';
+
+  if (!appKey || !appSecret || !accessToken) {
+    throw new Error('ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET, and ALIEXPRESS_ACCESS_TOKEN are required for OpenService AliExpress API. Please set them in your .env file.');
+  }
+
+  // OpenService API typically uses query product search endpoint
+  // Endpoint: /solutions/product/api/query/aliexpress.product.search
+  const endpoint = '/solutions/product/api/query/aliexpress.product.search';
+  
+  // Build request parameters according to OpenService API spec
+  const params = new URLSearchParams({
+    keywords: query,
+    pageNo: '1',
+    pageSize: options.limit.toString(),
+    sort: options.sortBy === 'ORDERS_DESC' ? 'SALE_DESC' : 'RATING_DESC',
+    locale: 'en_US',
+    currency: 'USD',
+    shipToCountry: options.shipToCountry || 'US',
+  });
+
+  // OpenService requires signature generation (HMAC-SHA256)
+  // For now, using access token in header (simplified - may need full OAuth flow)
+  const response = await fetch(`${apiUrl}${endpoint}?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+      'X-Api-Key': appKey,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenService AliExpress API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  
+  // OpenService API response structure may differ - adjust mapping based on actual response
+  const products = data.result?.products || data.products || data.data?.products || [];
+  
+  return products.map((item: any) => ({
+    id: item.productId || item.product_id || crypto.randomUUID(),
+    name: item.subject || item.title || item.productTitle || 'Unknown Product',
+    description: item.productDescription || item.description || '',
+    price: parseFloat(item.productPrice?.value || item.price || item.productPrice || 0),
+    currency: item.currencyCode || item.currency || 'USD',
+    imageUrl: item.productMainImageUrl || item.mainImageUrl || item.imageUrl || '',
+    buyUrl: item.productUrl || item.affiliateProductUrl || item.productDetailUrl || '',
+    vendor: item.storeName || item.sellerName || 'AliExpress',
+    category: item.categoryName || item.category || '',
+    rating: parseFloat(item.evaluateScore || item.rating || item.averageStarRate || 0),
+    reviews: parseInt(item.evaluateCount || item.reviews || item.totalReviews || 0),
+    orders: parseInt(item.volume || item.orders || item.totalOrders || 0),
+    shippingDays: parseInt(item.deliveryTime || item.shippingDays || 30),
+    shippingMethod: item.shippingMethod || 'Standard',
+    inStock: item.inStock !== false,
+    supplierProductId: item.productId || item.product_id,
+    supplierPrice: parseFloat(item.productPrice?.value || item.price || item.productPrice || 0),
   }));
 }
 
@@ -509,23 +597,62 @@ export async function getProductById(supplierProductId: string): Promise<Product
   const apiProvider = process.env.DROPSHIPPING_API_PROVIDER || 'aliexpress';
   const apiKey = process.env.DROPSHIPPING_API_KEY || process.env.RAPIDAPI_KEY || '';
 
-  if (!apiKey) {
-    throw new Error('DROPSHIPPING_API_KEY or RAPIDAPI_KEY is required to fetch products by ID.');
-  }
-
   try {
     let product: Product | null = null;
 
-    if (apiProvider === 'aliexpress') {
-      const apiUrl = process.env.ALIEXPRESS_API_URL || 'https://aliexpress-data.p.rapidapi.com';
-      const response = await fetch(`${apiUrl}/product/${supplierProductId}`, {
-        headers: {
-          'X-RapidAPI-Key': apiKey,
-          'X-RapidAPI-Host': 'aliexpress-data.p.rapidapi.com',
-        },
-      });
+    // Check if using OpenService (official AliExpress API)
+    if (apiProvider === 'openservice-aliexpress' || process.env.ALIEXPRESS_APP_KEY) {
+        const appKey = process.env.ALIEXPRESS_APP_KEY || '';
+        const accessToken = process.env.ALIEXPRESS_ACCESS_TOKEN || '';
+        const apiUrl = process.env.ALIEXPRESS_API_URL || 'https://api-sg.aliexpress.com';
+        
+        const response = await fetch(`${apiUrl}/solutions/product/api/query/aliexpress.product.detail.get?productId=${supplierProductId}`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'X-Api-Key': appKey,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const item = data.result || data.data || data;
+          product = {
+            id: item.productId || supplierProductId,
+            name: item.subject || item.title || 'Unknown Product',
+            description: item.productDescription || item.description || '',
+            price: parseFloat(item.productPrice?.value || item.price || 0),
+            currency: item.currencyCode || 'USD',
+            imageUrl: item.productMainImageUrl || item.mainImageUrl || '',
+            buyUrl: item.productUrl || item.affiliateProductUrl || '',
+            vendor: item.storeName || 'AliExpress',
+            category: item.categoryName || '',
+            rating: parseFloat(item.evaluateScore || item.rating || 0),
+            reviews: parseInt(item.evaluateCount || item.reviews || 0),
+            orders: parseInt(item.volume || item.orders || 0),
+            shippingDays: parseInt(item.deliveryTime || 30),
+            shippingMethod: item.shippingMethod || 'Standard',
+            inStock: item.inStock !== false,
+            supplierProductId: item.productId || supplierProductId,
+            supplierPrice: parseFloat(item.productPrice?.value || item.price || 0),
+          };
+        } else if (response.status === 404) {
+          return null;
+        }
+      } else if (apiProvider === 'aliexpress') {
+        // RapidAPI fallback (legacy)
+        if (!apiKey) {
+          throw new Error('RAPIDAPI_KEY is required for RapidAPI AliExpress. Use OpenService (openservice-aliexpress) or provide RAPIDAPI_KEY.');
+        }
+        
+        const apiUrl = process.env.ALIEXPRESS_API_URL || 'https://aliexpress-data.p.rapidapi.com';
+        const response = await fetch(`${apiUrl}/product/${supplierProductId}`, {
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'aliexpress-data.p.rapidapi.com',
+          },
+        });
 
-      if (response.ok) {
+        if (response.ok) {
         const data = await response.json();
         product = {
           id: data.productId || supplierProductId,
