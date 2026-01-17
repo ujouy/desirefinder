@@ -36,37 +36,60 @@ export async function GET(req: NextRequest) {
       }
 
       // Exchange authorization code for access token
-      // Note: OpenService API endpoint may vary - check official docs
+      // OpenService AliExpress OAuth token endpoint
       try {
-        const tokenResponse = await fetch('https://api-sg.aliexpress.com/oauth/token', {
+        // Try standard OAuth 2.0 token endpoint
+        const tokenUrl = 'https://oauth.aliexpress.com/token';
+        
+        const tokenParams = new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: appKey,
+          client_secret: appSecret,
+          code: code,
+          redirect_uri: redirectUri,
+        });
+
+        const tokenResponse = await fetch(tokenUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: JSON.stringify({
-            grant_type: 'authorization_code',
-            client_id: appKey,
-            client_secret: appSecret,
-            code: code,
-            redirect_uri: redirectUri,
-          }),
+          body: tokenParams.toString(),
         });
 
         if (tokenResponse.ok) {
           const tokenData = await tokenResponse.json();
           
-          // Store the access token (you might want to save this to database)
-          // For now, we'll just log it - you should update your .env.production
-          console.log('Access token received:', tokenData.access_token);
+          // Extract tokens from response
+          const accessToken = tokenData.access_token || tokenData.access_token;
+          const refreshToken = tokenData.refresh_token;
+          const expiresIn = tokenData.expires_in;
           
-          return NextResponse.redirect(
-            new URL('/?success=aliexpress_connected', req.url)
-          );
+          // IMPORTANT: Display the access token so you can copy it
+          // In production, you might want to store this securely in a database
+          console.log('✅ Access Token Received!');
+          console.log('Access Token:', accessToken);
+          console.log('Refresh Token:', refreshToken);
+          console.log('Expires In:', expiresIn, 'seconds');
+          
+          // Redirect to a page that displays the token (for easy copying)
+          // Or return JSON with the token
+          const successUrl = new URL('/?success=aliexpress_connected', req.url);
+          successUrl.searchParams.set('access_token', accessToken);
+          successUrl.searchParams.set('expires_in', expiresIn?.toString() || '');
+          
+          return NextResponse.redirect(successUrl);
         } else {
           const errorData = await tokenResponse.text();
           console.error('Token exchange failed:', errorData);
+          console.error('Status:', tokenResponse.status);
+          
+          // Try alternative endpoint format
+          console.log('Trying alternative token endpoint...');
+          // You may need to check OpenService docs for the exact endpoint
+          
           return NextResponse.redirect(
-            new URL('/?error=token_exchange_failed', req.url)
+            new URL(`/?error=token_exchange_failed&details=${encodeURIComponent(errorData)}`, req.url)
           );
         }
       } catch (error) {
