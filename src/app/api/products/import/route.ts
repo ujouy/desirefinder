@@ -183,7 +183,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Import Stripe dynamically to avoid build-time issues
-    const stripe = (await import('stripe')).default(stripeSecretKey);
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(stripeSecretKey);
 
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
