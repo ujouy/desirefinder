@@ -77,8 +77,8 @@ model Product {
   category        String?
   rating          Float?
   reviews         Int?
-  orders          Int?
-  shippingDays    Int?
+  orderCount      Int?    // Number of orders from supplier (e.g., "1000+ orders")
+  shippingDays     Int?
   shippingMethod  String?
   inStock         Boolean  @default(true)
   createdAt       DateTime @default(now())
