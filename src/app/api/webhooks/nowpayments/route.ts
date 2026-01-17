@@ -9,7 +9,6 @@ import crypto from 'crypto';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const signature = req.headers.get('x-nowpayments-sig');
 
     // 🛡️ SECURITY: Verify webhook signature (REQUIRED - fail closed)
     const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;

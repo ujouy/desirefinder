@@ -91,8 +91,6 @@ Example workflow:
 
 You MUST use this tool extensively when the user is looking for products, gifts, or shopping recommendations.
 `;
-<｜tool▁call▁begin｜>
-read_file
 
 const shoppingSearchAction: ResearchAction<typeof actionSchema> = {
   name: 'shopping_search',
