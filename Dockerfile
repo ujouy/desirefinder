@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip sqlite3 && rm -rf /
 WORKDIR /home/perplexica
 
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --network-timeout 600000
+RUN yarn install --network-timeout 600000
 
 COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js tailwind.config.ts ./
 COPY prisma ./prisma
@@ -13,6 +13,10 @@ COPY src ./src
 COPY public ./public
 
 RUN mkdir -p /home/perplexica/data
+# Generate Prisma client (doesn't need database connection, just reads schema)
+# Set a dummy DATABASE_URL to satisfy Prisma's env requirement during build
+ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
+RUN yarn db:generate || echo "Prisma generate failed, will retry at runtime"
 RUN yarn build
 
 FROM node:24.5.0-slim
