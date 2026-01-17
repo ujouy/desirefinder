@@ -31,6 +31,8 @@ COPY --from=builder /home/perplexica/.next/static ./public/_next/static
 COPY --from=builder /home/perplexica/.next/standalone ./
 COPY --from=builder /home/perplexica/data ./data
 COPY --from=builder /home/perplexica/prisma ./prisma
+# Copy package.json for Prisma version reference (standalone includes node_modules but we need package.json for scripts)
+COPY --from=builder /home/perplexica/package.json ./package.json
 
 RUN mkdir /home/perplexica/uploads
 
