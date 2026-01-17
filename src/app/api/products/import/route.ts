@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
           category: productData.category || null,
           rating: productData.rating || null,
           reviews: productData.reviews || null,
-          orders: productData.orders || null,
+          orderCount: productData.orders || null, // Map API 'orders' to DB 'orderCount'
           shippingDays: productData.shippingDays || null,
           shippingMethod: productData.shippingMethod || null,
           inStock: productData.inStock !== false,
