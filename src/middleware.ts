@@ -12,16 +12,25 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (authMiddleware, req) => {
-  if (!isPublicRoute(req)) {
-    const { userId } = await auth();
-    if (!userId) {
-      const signInUrl = new URL('/sign-in', req.url);
-      signInUrl.searchParams.set('redirect_url', req.url);
-      return NextResponse.redirect(signInUrl);
-    }
+  // Skip auth check for public routes
+  if (isPublicRoute(req)) {
+    return NextResponse.next();
   }
+  
+  // For protected routes, check authentication
+  const { userId } = await auth();
+  if (!userId) {
+    const signInUrl = new URL('/sign-in', req.url);
+    signInUrl.searchParams.set('redirect_url', req.url);
+    return NextResponse.redirect(signInUrl);
+  }
+  
+  return NextResponse.next();
 });
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
+  matcher: [
+    // Skip Next.js internals and static files
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)',
+  ],
 };
